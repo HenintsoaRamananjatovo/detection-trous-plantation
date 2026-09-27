@@ -65,13 +65,22 @@ Les deux scripts font la même chose : créer `.venv` dans le dossier du projet,
 puis y installer `requirements.txt`. Rien n'est posé ailleurs sur la machine, et
 désinstaller revient à supprimer le dossier.
 
-Sous Linux, `pip` livre par défaut un PyTorch compilé pour CUDA, soit plusieurs
+Deux particularités de Linux méritent d'être connues.
+
+`pip` y livre par défaut un PyTorch compilé pour CUDA, soit plusieurs
 gigaoctets de dépendances NVIDIA inutiles sans carte graphique dédiée. Pour une
 machine à processeur seul :
 
 ```bash
 ./.venv/bin/python -m pip install torch==2.13.0 \
     --index-url https://download.pytorch.org/whl/cpu
+```
+
+Et sur un serveur sans environnement graphique, `opencv-python`, installé comme
+dépendance d'`ultralytics`, réclame des bibliothèques système absentes :
+
+```bash
+sudo apt install libgl1 libglib2.0-0     # Debian, Ubuntu
 ```
 
 ## Utilisation
