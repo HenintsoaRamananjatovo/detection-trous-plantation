@@ -7,6 +7,22 @@ from typing import Any, Callable
 
 ProgressCallback = Callable[[str, float, str], None]
 
+PACKAGE_ROOT = Path(__file__).resolve().parent
+# Copie figée des poids retenus, livrée avec le paquet pour que la version du
+# code et celle du modèle ne puissent pas se dissocier. La sortie du projet
+# d'entraînement reste PlantationDatasetV2/models_v2.
+DEFAULT_MODEL = PACKAGE_ROOT / "models" / "direct_two_classes_best.pt"
+DEFAULT_CONFIDENCE = 0.20
+# Les poids livrés ont été entraînés avec une rotation libre, qui gonfle les
+# boîtes réencadrées. Remettre 1.0 dès qu'un modèle entraîné sans rotation est
+# déployé, et recalibrer après chaque réentraînement : le ratio médian entre
+# taille prédite et taille annotée sur la validation, dont on prend l'inverse.
+# Sans cette correction, le rappel tombe de 94 % à 61 % sur le test verrouillé.
+DEFAULT_BOX_SCALE = 0.82
+# 0.82 et 2.0 maximisent le F1 conjointement sur les tuiles de test source2 et
+# result00389 ; voir PlantationDatasetV2/geotiff_evaluation/shape_filter.json.
+DEFAULT_MAX_ASPECT_RATIO = 2.0
+
 
 @dataclass(frozen=True)
 class TileWindow:
@@ -41,16 +57,18 @@ class Detection:
 
 @dataclass(frozen=True)
 class PipelineConfig:
+    # `model` porte une valeur par défaut pour qu'un appelant qui ne précise
+    # rien obtienne la configuration mesurée, et non une configuration neutre.
     source: Path
-    model: Path
     output_root: Path
+    model: Path = DEFAULT_MODEL
     classifier: Path | None = None
-    confidence: float = 0.20
+    confidence: float = DEFAULT_CONFIDENCE
     classifier_confidence: float = 0.0
     detector_nms_iou: float = 0.70
     crop_context: float = 1.8
-    box_scale: float = 1.0
-    max_aspect_ratio: float = 2.0
+    box_scale: float = DEFAULT_BOX_SCALE
+    max_aspect_ratio: float = DEFAULT_MAX_ASPECT_RATIO
     ignore_resolution: bool = False
     auto_resample: bool = True
     prepared_root: Path | None = None

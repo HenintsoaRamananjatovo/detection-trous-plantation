@@ -62,8 +62,9 @@ chmod +x setup.sh start_web.sh
 ```
 
 Les deux scripts font la même chose : créer `.venv` dans le dossier du projet,
-puis y installer `requirements.txt`. Rien n'est posé ailleurs sur la machine, et
-désinstaller revient à supprimer le dossier.
+puis y installer `requirements.txt`, qui installe le projet lui-même en mode
+modifiable avec les dépendances épinglées dans `pyproject.toml`. Rien n'est posé
+ailleurs sur la machine, et désinstaller revient à supprimer le dossier.
 
 Deux particularités de Linux méritent d'être connues.
 
@@ -128,6 +129,27 @@ Options utiles :
 `cli.py --help` liste les réglages fins du détecteur. Ils sont calibrés, les
 modifier dégrade les résultats mesurés.
 
+### Depuis un autre projet
+
+Le moteur s'installe comme une dépendance, en désignant une version publiée :
+
+```bash
+pip install "git+https://github.com/HenintsoaRamananjatovo/detection-trous-plantation@v0.1.0"
+```
+
+Toujours viser une étiquette, jamais une branche : pip garde une branche en
+cache et servirait une version périmée sans le dire. Une seule fonction suffit
+ensuite, et ne rien préciser d'autre donne la configuration mesurée :
+
+```python
+from plantation_inference import PipelineConfig, run_pipeline
+
+resultat = run_pipeline(PipelineConfig(source=raster, output_root=sorties))
+```
+
+`run_pipeline` accepte un second argument facultatif, une fonction appelée à
+chaque avancement, pour afficher une progression ailleurs que dans ce projet.
+
 ## Résultats produits
 
 Chaque exécution crée un dossier indépendant sous `outputs/` :
@@ -173,8 +195,11 @@ projet d'entraînement, sous `geotiff_evaluation/limites_resolution.json`.
 
 ## Modèle
 
-Les poids utilisés sont dans `models/`, copiés depuis le projet d'entraînement
-pour que celui-ci soit déployable seul.
+Les poids utilisés sont dans `plantation_inference/models/`, à l'intérieur du
+paquet, copiés depuis le projet d'entraînement pour que celui-ci soit déployable
+seul. Ils voyagent avec le code : une installation du paquet, ici ou ailleurs,
+emporte le modèle et ses réglages calibrés, et la version du paquet désigne donc
+toujours un couple code-modèle précis.
 
 Un seul réseau fait tout : `direct_two_classes_best.pt`, un YOLO11s de détection
 qui produit en une passe la boîte et sa classe. Il n'y a pas d'étape de
@@ -209,19 +234,26 @@ Trois corrections sont appliquées, toutes issues de mesures :
 ./.venv/bin/python -m pytest -q           # Linux, macOS
 ```
 
-29 tests couvrent le découpage, la déduplication, les filtres de forme, le
+32 tests couvrent le découpage, la déduplication, les filtres de forme, le
 rééchantillonnage automatique et son cache, le téléversement et ses refus. Ils
 fabriquent leurs propres rasters et n'ont besoin d'aucune donnée externe.
+
+Trois d'entre eux gardent le couple code-modèle : ils vérifient que les poids
+livrés sont bien ceux qui ont été mesurés, par leur empreinte, et qu'une
+configuration construite sans aucune option est la configuration calibrée. Un
+réentraînement fait donc échouer la suite, ce qui est le but : il oblige à
+recalibrer `box_scale` avant de déployer.
 
 ## Contenu du projet
 
 | Élément | Rôle |
 | --- | --- |
 | `app.py` | interface web |
-| `cli.py` | ligne de commande et valeurs par défaut |
-| `plantation_inference/` | le pipeline : découpage, détection, préparation, sorties |
+| `cli.py` | ligne de commande |
+| `plantation_inference/` | le pipeline : découpage, détection, préparation, sorties, et les poids du réseau |
+| `pyproject.toml` | le paquet installable et ses versions épinglées |
 | `templates/` | la page web |
-| `models/` | les poids du réseau |
+| `models/` | le classificateur en cascade abandonné, gardé pour mémoire |
 | `outputs/` | les résultats, un dossier par exécution |
 | `tests/` | la suite de tests |
 | `setup.ps1`, `setup.sh` | installation, Windows et Unix |

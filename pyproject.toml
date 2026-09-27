@@ -1,0 +1,35 @@
+[project]
+name = "plantation-inference"
+version = "0.1.0"
+description = "Détection des trous de plantation dans une orthophoto, et comptage de ceux qui portent un plant"
+requires-python = ">=3.10"
+dependencies = [
+    "ultralytics==8.4.104",
+    "torch==2.13.0",
+    "rasterio==1.5.0",
+    "fiona==1.10.1",
+    "shapely==2.1.2",
+    "Pillow==12.3.0",
+    "numpy==2.5.1",
+]
+
+# Le moteur s'importe sans Flask ni pytest : seule l'interface web autonome et la
+# suite de tests en ont besoin, et un appelant qui n'en veut pas ne les installe
+# pas.
+[project.optional-dependencies]
+web = ["Flask==3.1.3"]
+dev = ["pytest==9.0.2"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# app.py, cli.py et les scripts d'installation restent hors du paquet : ils
+# servent à l'outil autonome, pas à un appelant qui importe le moteur.
+packages = ["plantation_inference"]
+
+# Le nom du fichier est écrit en clair, et non par un motif, pour qu'un
+# changement de modèle oblige à passer ici et à monter la version du paquet.
+[tool.setuptools.package-data]
+plantation_inference = ["models/direct_two_classes_best.pt"]

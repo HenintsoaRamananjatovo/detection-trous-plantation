@@ -4,27 +4,28 @@ import argparse
 import json
 from pathlib import Path
 
-from plantation_inference import PipelineConfig, run_pipeline
+# Les réglages calibrés appartiennent au paquet : les redéfinir ici ferait deux
+# sources pour une même valeur mesurée, et un autre appelant en obtiendrait une
+# troisième. Ils sont réexportés parce que app.py les importe de ce module.
+from plantation_inference import (
+    DEFAULT_BOX_SCALE,
+    DEFAULT_CONFIDENCE,
+    DEFAULT_MAX_ASPECT_RATIO,
+    DEFAULT_MODEL,
+    PipelineConfig,
+    run_pipeline,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-# Copie figée des poids retenus. PlantationDatasetV2/models_v2 reste la sortie du
-# projet d'entraînement ; ce dossier-ci rend l'inférence déployable seule.
-MODELS = PROJECT_ROOT / "models"
-DEFAULT_MODEL = MODELS / "direct_two_classes_best.pt"
 DEFAULT_OUTPUTS = PROJECT_ROOT / "outputs"
 # Le détecteur prédit déjà vide ou occupé. Le classificateur en cascade dégrade
 # ce classement sur les deux rasters annotés, de 0.935 à 0.908 sur source2 et de
 # 0.887 à 0.827 sur result00389, tout en doublant la durée. Il reste accessible
-# par --classifier pour comparaison.
-OPTIONAL_CLASSIFIER = MODELS / "occupancy_classifier_best.pt"
+# par --classifier pour comparaison. Il ne voyage pas avec le paquet : cette
+# architecture est abandonnée, ces poids ne servent plus qu'à refaire la mesure.
+OPTIONAL_CLASSIFIER = PROJECT_ROOT / "models" / "occupancy_classifier_best.pt"
 DEFAULT_CLASSIFIER: Path | None = None
-# Les poids V2 ont été entraînés avec une rotation libre, qui gonfle les boîtes
-# réencadrées. Remettre 1.0 dès qu'un modèle entraîné sans rotation est déployé.
-# 0.82 et 2.0 maximisent le F1 conjointement sur les tuiles de test source2 et
-# result00389 ; voir PlantationDatasetV2/geotiff_evaluation/shape_filter.json.
-DEFAULT_BOX_SCALE = 0.82
-DEFAULT_MAX_ASPECT_RATIO = 2.0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -51,7 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUTS)
-    parser.add_argument("--confidence", type=float, default=0.20)
+    parser.add_argument("--confidence", type=float, default=DEFAULT_CONFIDENCE)
     parser.add_argument("--classifier-confidence", type=float, default=0.0)
     parser.add_argument("--detector-nms-iou", type=float, default=0.70)
     parser.add_argument("--crop-context", type=float, default=1.8)
