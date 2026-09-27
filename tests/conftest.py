@@ -1,0 +1,4 @@
+from plantation_inference.runtime_env import configure_geospatial_data
+
+
+configure_geospatial_data()

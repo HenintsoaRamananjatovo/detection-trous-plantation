@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PlantationInference</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; }
+    body { margin: 0; background: #f3f6f2; color: #1d2a20; }
+    main { max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+    section { background: white; padding: 1.75rem; border-radius: 12px; box-shadow: 0 3px 16px #16351d18; }
+    h1 { margin-top: 0; }
+    label { display: block; font-weight: 650; margin-bottom: .35rem; }
+    input { box-sizing: border-box; width: 100%; padding: .65rem; border: 1px solid #bbc8bd; border-radius: 6px; background: white; }
+    button { margin-top: 1.2rem; padding: .85rem 1.4rem; border: 0; border-radius: 7px; background: #176a32; color: white; font-weight: 700; font-size: 1.05rem; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: wait; }
+    progress { width: 100%; height: 1.3rem; margin-top: 1rem; accent-color: #18833d; }
+    #status { margin-top: .7rem; min-height: 1.5rem; }
+    #error { color: #a51515; white-space: pre-wrap; }
+    #results a { display: block; margin: .4rem 0; }
+    small { display: block; margin-top: .4rem; color: #526256; }
+    table { border-collapse: collapse; margin: .8rem 0; }
+    td { padding: .3rem .9rem .3rem 0; }
+    td:first-child { color: #526256; }
+    td:last-child { font-weight: 650; }
+  </style>
+</head>
+<body>
+<main>
+  <section>
+    <h1>Inférence de plantation</h1>
+    <p>Téléversez un GeoTIFF et lancez le traitement.</p>
+    <form id="job-form">
+      <label for="upload">GeoTIFF à analyser</label>
+      <input id="upload" name="upload" type="file" accept=".tif,.tiff,image/tiff">
+      <small>Le modèle travaille à 3,89 cm/pixel : une image plus fine est
+        rééchantillonnée automatiquement. Au-delà de 10 cm/pixel, les trous sont
+        trop petits pour être reconnus et le fichier est refusé.</small>
+
+      <button id="submit" type="submit">Lancer le traitement</button>
+    </form>
+    <progress id="progress" max="1" value="0"></progress>
+    <div id="status">Prêt.</div>
+    <div id="error"></div>
+    <div id="results"></div>
+  </section>
+</main>
+<script>
+  const form = document.querySelector("#job-form");
+  const submit = document.querySelector("#submit");
+  const progress = document.querySelector("#progress");
+  const status = document.querySelector("#status");
+  const errorBox = document.querySelector("#error");
+  const results = document.querySelector("#results");
+
+  function showError(message) {
+    errorBox.textContent = message;
+    submit.disabled = false;
+  }
+
+  function summaryTable(result) {
+    const rate = result.success_rate === null
+      ? "indisponible"
+      : `${(100 * result.success_rate).toFixed(1)} %`;
+    const rows = [
+      ["Trous détectés", result.detection_count],
+      ["Vides", result.empty_count],
+      ["Occupés", result.occupied_count],
+      ["Taux d’occupation", rate],
+      ["Durée", `${result.elapsed_seconds.toFixed(0)} s`],
+      ["Dossier", result.run_dir],
+    ];
+    const table = document.createElement("table");
+    for (const [name, value] of rows) {
+      const tr = document.createElement("tr");
+      const label = document.createElement("td");
+      label.textContent = name;
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      tr.append(label, cell);
+      table.append(tr);
+    }
+    return table;
+  }
+
+  // fetch() ne rapporte pas l'avancement de l'envoi, or un GeoTIFF pèse souvent
+  // plusieurs centaines de mégaoctets : sans retour, la page paraît figée.
+  function sendJob(formData) {
+    return new Promise((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      request.open("POST", "/jobs");
+      request.upload.addEventListener("progress", event => {
+        if (!event.lengthComputable || !event.total) return;
+        progress.value = event.loaded / event.total;
+        const sent = (event.loaded / 1048576).toFixed(0);
+        const total = (event.total / 1048576).toFixed(0);
+        status.textContent = `Téléversement ${sent} / ${total} Mo`;
+      });
+      request.addEventListener("load", () => {
+        let payload;
+        try {
+          payload = JSON.parse(request.responseText);
+        } catch {
+          reject(new Error(`Réponse illisible du serveur (HTTP ${request.status})`));
+          return;
+        }
+        if (request.status >= 400) {
+          reject(new Error(payload.error || `Erreur HTTP ${request.status}`));
+        } else {
+          resolve(payload);
+        }
+      });
+      request.addEventListener("error", () => reject(new Error("Connexion interrompue")));
+      request.addEventListener("abort", () => reject(new Error("Envoi annulé")));
+      request.send(formData);
+    });
+  }
+
+  async function poll(jobId) {
+    const response = await fetch(`/jobs/${jobId}`);
+    const job = await response.json();
+    progress.value = job.progress || 0;
+    status.textContent = `${(100 * (job.progress || 0)).toFixed(1)} % — ${job.message}`;
+    if (job.state === "failed") {
+      showError(job.error || "Erreur inconnue");
+      return;
+    }
+    if (job.state === "completed") {
+      submit.disabled = false;
+      results.replaceChildren();
+      const title = document.createElement("h2");
+      title.textContent = "Résultats";
+      results.append(title, summaryTable(job.result));
+      const labels = {
+        annotated_tiff: "GeoTIFF annoté (boîtes dessinées)",
+        geopackage: "GeoPackage",
+        detections_csv: "Détections CSV",
+        summary_csv: "Résumé CSV",
+        metadata_json: "Métadonnées JSON",
+      };
+      for (const [key, label] of Object.entries(labels)) {
+        const href = (job.files || {})[key];
+        if (!href) continue;
+        const link = document.createElement("a");
+        link.href = href;
+        link.textContent = `Télécharger : ${label}`;
+        results.append(link);
+      }
+      return;
+    }
+    window.setTimeout(() => poll(jobId).catch(err => showError(err.message)), 1000);
+  }
+
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    submit.disabled = true;
+    errorBox.textContent = "";
+    results.replaceChildren();
+    progress.value = 0;
+    status.textContent = "Envoi…";
+    try {
+      const payload = await sendJob(new FormData(form));
+      status.textContent = "Traitement en cours…";
+      poll(payload.id).catch(err => showError(err.message));
+    } catch (error) {
+      progress.value = 0;
+      showError(error.message);
+    }
+  });
+</script>
+</body>
+</html>
