@@ -1,0 +1,5 @@
+# Un script shell à fins de ligne Windows est refusé par bash.
+*.sh text eol=lf
+*.ps1 text eol=crlf
+*.pt binary
+*.tif binary

@@ -34,25 +34,56 @@ Sur ces tuiles, le taux réel est de 38,6 % et le modèle annonce 34,0 %, soit
 Ce niveau convient à un diagnostic ou à un suivi de parcelle. Il ne convient pas
 à un constat contractuel trou par trou sans relecture humaine.
 
-Le détail chiffré est dans
-`PlantationDatasetV2\geotiff_evaluation\result00389_run_20260922.json`.
+Le détail chiffré est conservé dans le projet d'entraînement, sous
+`geotiff_evaluation/result00389_run_20260922.json`.
 
 ## Installation
 
-Sous Windows, dans PowerShell :
+Il faut Python 3.10 ou plus récent, validé sur 3.12, Git, et environ 3 Go
+d'espace disque pour l'environnement virtuel. Les poids du modèle sont dans le
+dépôt : il n'y a aucun téléchargement séparé.
+
+### Windows, dans PowerShell
 
 ```powershell
-cd "D:\M2\Projet Stage\PlantationInference"
+git clone https://github.com/HenintsoaRamananjatovo/detection-trous-plantation.git
+cd detection-trous-plantation
 Set-ExecutionPolicy -Scope Process Bypass
 .\setup.ps1
 ```
 
+### Linux ou macOS
+
+```bash
+git clone https://github.com/HenintsoaRamananjatovo/detection-trous-plantation.git
+cd detection-trous-plantation
+chmod +x setup.sh start_web.sh
+./setup.sh
+```
+
+Les deux scripts font la même chose : créer `.venv` dans le dossier du projet,
+puis y installer `requirements.txt`. Rien n'est posé ailleurs sur la machine, et
+désinstaller revient à supprimer le dossier.
+
+Sous Linux, `pip` livre par défaut un PyTorch compilé pour CUDA, soit plusieurs
+gigaoctets de dépendances NVIDIA inutiles sans carte graphique dédiée. Pour une
+machine à processeur seul :
+
+```bash
+./.venv/bin/python -m pip install torch==2.13.0 \
+    --index-url https://download.pytorch.org/whl/cpu
+```
+
 ## Utilisation
+
+Dans ce qui suit, l'interpréteur du projet s'écrit
+`.\.venv\Scripts\python.exe` sous Windows et `./.venv/bin/python` ailleurs.
 
 ### Interface web
 
 ```powershell
-.\start_web.ps1
+.\start_web.ps1      # Windows
+./start_web.sh       # Linux, macOS
 ```
 
 Ouvrir <http://127.0.0.1:5000>, choisir un GeoTIFF, lancer. La page affiche la
@@ -62,14 +93,15 @@ résultat au téléchargement.
 Aucun réglage n'est exposé : les valeurs par défaut sont celles validées par la
 mesure, et les rendre modifiables inviterait à les dégrader sans le savoir.
 
-Le fichier téléversé est copié dans `uploads\`, que rien ne purge
+Le fichier téléversé est copié dans `uploads/`, que rien ne purge
 automatiquement. Pour un raster déjà présent sur la machine, préférer la ligne
 de commande, qui le lit sur place sans le dupliquer.
 
 ### Ligne de commande
 
 ```powershell
-.\.venv\Scripts\python.exe cli.py "chemin\vers\parcelle.tif"
+.\.venv\Scripts\python.exe cli.py "chemin\vers\parcelle.tif"   # Windows
+./.venv/bin/python cli.py /chemin/vers/parcelle.tif            # Linux, macOS
 ```
 
 Options utiles :
@@ -89,7 +121,7 @@ modifier dégrade les résultats mesurés.
 
 ## Résultats produits
 
-Chaque exécution crée un dossier indépendant sous `outputs\` :
+Chaque exécution crée un dossier indépendant sous `outputs/` :
 
 | Fichier | Contenu |
 | --- | --- |
@@ -115,7 +147,7 @@ image à une autre échelle lui présente des trous d'une taille inattendue, et 
 
 Le pipeline s'en occupe seul. Un raster qui s'écarte de plus de 20 % de cette
 valeur est rééchantillonné avant traitement, et la copie corrigée est conservée
-dans `<sorties>\_prepared` pour être réutilisée ensuite.
+dans `<sorties>/_prepared` pour être réutilisée ensuite.
 
 Vérifié sur une même zone de terrain : 111 trous détectés en partant de
 `result.tif` à 0,85 cm/pixel avec correction automatique, contre 113 en partant
@@ -127,13 +159,13 @@ ainsi de 1720 à 262 Mo. Agrandir une image plus grossière rétablit la taille
 apparente mais pas le détail, qui n'a jamais été enregistré. Au-delà de
 **10 cm par pixel** le raster est donc refusé, avec un message qui l'explique.
 
-Les mesures de dégradation en fonction de la résolution sont dans
-`PlantationDatasetV2\geotiff_evaluation\limites_resolution.json`.
+Les mesures de dégradation en fonction de la résolution sont conservées dans le
+projet d'entraînement, sous `geotiff_evaluation/limites_resolution.json`.
 
 ## Modèle
 
-Les poids utilisés sont dans `models\`, copiés depuis le projet d'entraînement
-`PlantationDatasetV2` pour que celui-ci soit déployable seul.
+Les poids utilisés sont dans `models/`, copiés depuis le projet d'entraînement
+pour que celui-ci soit déployable seul.
 
 Un seul réseau fait tout : `direct_two_classes_best.pt`, un YOLO11s de détection
 qui produit en une passe la boîte et sa classe. Il n'y a pas d'étape de
@@ -164,7 +196,8 @@ Trois corrections sont appliquées, toutes issues de mesures :
 ## Tests
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m pytest -q   # Windows
+./.venv/bin/python -m pytest -q           # Linux, macOS
 ```
 
 29 tests couvrent le découpage, la déduplication, les filtres de forme, le
@@ -177,8 +210,10 @@ fabriquent leurs propres rasters et n'ont besoin d'aucune donnée externe.
 | --- | --- |
 | `app.py` | interface web |
 | `cli.py` | ligne de commande et valeurs par défaut |
-| `plantation_inference\` | le pipeline : découpage, détection, préparation, sorties |
-| `templates\` | la page web |
-| `models\` | les poids du réseau |
-| `outputs\` | les résultats, un dossier par exécution |
-| `tests\` | la suite de tests |
+| `plantation_inference/` | le pipeline : découpage, détection, préparation, sorties |
+| `templates/` | la page web |
+| `models/` | les poids du réseau |
+| `outputs/` | les résultats, un dossier par exécution |
+| `tests/` | la suite de tests |
+| `setup.ps1`, `setup.sh` | installation, Windows et Unix |
+| `start_web.ps1`, `start_web.sh` | lancement de l'interface |
