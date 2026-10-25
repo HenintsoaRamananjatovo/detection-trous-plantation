@@ -51,3 +51,4 @@ def test_a_configuration_without_options_is_the_calibrated_one(tmp_path: Path) -
     assert config.box_scale == DEFAULT_BOX_SCALE == 0.82
     assert config.max_aspect_ratio == DEFAULT_MAX_ASPECT_RATIO == 2.0
     assert config.confidence == DEFAULT_CONFIDENCE == 0.20
+    assert config.overlap == 128

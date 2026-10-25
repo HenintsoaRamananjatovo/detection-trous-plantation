@@ -73,7 +73,9 @@ class PipelineConfig:
     auto_resample: bool = True
     prepared_root: Path | None = None
     tile_size: int = 512
-    overlap: int = 0
+    # Même défaut que la plateforme : sans chevauchement, les trous coupés
+    # par le bord d'une tuile sont souvent manqués, quel que soit le terrain.
+    overlap: int = 128
     nms_iou: float = 0.45
     device: str = "cpu"
     run_name: str | None = None
