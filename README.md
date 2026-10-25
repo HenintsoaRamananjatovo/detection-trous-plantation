@@ -176,21 +176,19 @@ Le modèle a été entraîné sur des images à **3,89 cm par pixel**, où un tr
 image à une autre échelle lui présente des trous d'une taille inattendue, et il
 échoue.
 
-Le pipeline s'en occupe seul. Un raster qui s'écarte de plus de 20 % de cette
-valeur est rééchantillonné avant traitement, et la copie corrigée est conservée
-dans `<sorties>/_prepared` pour être réutilisée ensuite.
+Le pipeline s'en occupe seul, dans un seul sens :
 
-Vérifié sur une même zone de terrain : 111 trous détectés en partant de
-`result.tif` à 0,85 cm/pixel avec correction automatique, contre 113 en partant
-du fichier préparé à la main, avec un nombre d'occupés identique.
+- un raster **déjà proche** de 3,89 cm/pixel (à 20 % près) est traité tel quel ;
+- un raster **plus fin** (ex. 3 cm ou 0,85 cm) est aussi gardé tel quel : le
+  dégrader vers 3,89 cm rétrécit les trous en pixels et fait chuter le rappel
+  (mesuré sur une orthophoto à 3 cm/pixel : ×2,4 trous en gardant le natif) ;
+- un raster **plus grossier**, jusqu'à **10 cm/pixel**, est rééchantillonné vers
+  3,89 cm ; la copie est conservée dans `<sorties>/_prepared` ;
+- au-delà de **10 cm/pixel**, le raster est refusé : agrandir ne recrée pas le
+  détail qui n'a jamais été enregistré.
 
-**La correction ne fonctionne bien que dans un sens.** Réduire une image plus
-fine ne perd rien d'utile et allège beaucoup le fichier : `result.tif` passe
-ainsi de 1720 à 262 Mo. Agrandir une image plus grossière rétablit la taille
-apparente mais pas le détail, qui n'a jamais été enregistré. Au-delà de
-**10 cm par pixel** le raster est donc refusé, avec un message qui l'explique.
-
-Les mesures de dégradation en fonction de la résolution sont conservées dans le
+Agrandir une image trop grossière aligne la taille apparente des trous mais ne
+récupère pas l'information perdue. Les mesures de dégradation sont dans le
 projet d'entraînement, sous `geotiff_evaluation/limites_resolution.json`.
 
 ## Modèle

@@ -76,10 +76,21 @@ def prepare_source(
     config: PipelineConfig,
     notify: Callable[[str, float, str], None],
 ) -> tuple[Path, float]:
-    """Raster prêt pour le modèle, rééchantillonné si son échelle diffère."""
+    """Raster prêt pour le modèle.
+
+    Un raster déjà à l'échelle d'entraînement (à 20 % près) est gardé tel quel.
+    Un raster **plus fin** aussi : le dégrader vers 3,89 cm/pixel rétrécit les
+    trous en pixels et fait chuter le rappel (mesuré sur une orthophoto à 3 cm).
+    Seul un raster **plus grossier**, encore utilisable, est rééchantillonné vers
+    l'échelle d'entraînement — agrandir ne recrée pas le détail, mais aligne la
+    taille apparente des trous.
+    """
     with rasterio.open(config.source) as probe:
         gsd = abs(probe.transform.a)
     if config.ignore_resolution or matches_training_scale(gsd):
+        return config.source, gsd
+    # Plus fin que l'entraînement : conserver le détail natif.
+    if gsd < TRAINING_GSD_M:
         return config.source, gsd
     if not config.auto_resample:
         check_resolution(gsd)

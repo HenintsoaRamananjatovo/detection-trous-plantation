@@ -170,7 +170,8 @@ class AnySizeDetector:
         return [Detection(1, "PlantingHoleOccupied", 0.95, 10, 10, 40, 40)]
 
 
-def test_a_finer_raster_is_resampled_to_the_training_scale(tmp_path: Path) -> None:
+def test_a_finer_raster_is_kept_at_native_scale(tmp_path: Path) -> None:
+    """Un raster plus fin n'est plus dégradé : le détail sert au rappel."""
     source = tmp_path / "trop_fin.tif"
     model = tmp_path / "model.pt"
     model.write_bytes(b"fake")
@@ -188,26 +189,52 @@ def test_a_finer_raster_is_resampled_to_the_training_scale(tmp_path: Path) -> No
     )
 
     metadata = json.loads(result.metadata_json.read_text(encoding="utf-8"))
-    assert metadata["resampled"] is True
+    assert metadata["resampled"] is False
     assert metadata["source"] == str(source.resolve())
+    assert metadata["processed_raster"] == str(source.resolve())
+    with rasterio.open(source) as raster:
+        assert abs(raster.transform.a) == pytest.approx(0.0085, rel=1e-3)
+        assert raster.width == 700
+    assert not (tmp_path / "outputs" / "_prepared").exists()
+
+
+def test_a_coarser_usable_raster_is_resampled_to_the_training_scale(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "un_peu_grossier.tif"
+    model = tmp_path / "model.pt"
+    model.write_bytes(b"fake")
+    # 6 cm/pixel : hors tolérance de 20 %, encore sous le plafond de 10 cm.
+    create_source(source, gsd=0.06)
+    common = {
+        "source": source,
+        "model": model,
+        "output_root": tmp_path / "outputs",
+        "tile_size": 1024,
+        "overlap": 0,
+    }
+
+    result = run_pipeline(
+        PipelineConfig(**common, run_name="auto"), detector=AnySizeDetector()
+    )
+
+    metadata = json.loads(result.metadata_json.read_text(encoding="utf-8"))
+    assert metadata["resampled"] is True
     prepared = Path(metadata["processed_raster"])
     assert prepared.parent == tmp_path / "outputs" / "_prepared"
     with rasterio.open(prepared) as raster:
         assert abs(raster.transform.a) == pytest.approx(TRAINING_GSD_M, rel=1e-3)
-        # 700 pixels de 0.85 cm couvrent 5.95 m, soit 153 pixels de 3.89 cm.
-        assert raster.width == 153
 
-    # Le second passage doit réutiliser la copie au lieu de la refabriquer.
     horodatage = prepared.stat().st_mtime_ns
     run_pipeline(PipelineConfig(**common, run_name="reprise"), detector=AnySizeDetector())
     assert prepared.stat().st_mtime_ns == horodatage
 
 
 def test_resampling_can_be_refused_or_bypassed(tmp_path: Path) -> None:
-    source = tmp_path / "trop_fin.tif"
+    source = tmp_path / "un_peu_grossier.tif"
     model = tmp_path / "model.pt"
     model.write_bytes(b"fake")
-    create_source(source, gsd=0.0085)
+    create_source(source, gsd=0.06)
     common = {
         "source": source,
         "model": model,

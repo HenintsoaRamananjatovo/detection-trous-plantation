@@ -1,6 +1,6 @@
 [project]
 name = "plantation-inference"
-version = "0.1.0"
+version = "0.1.1"
 description = "Détection des trous de plantation dans une orthophoto, et comptage de ceux qui portent un plant"
 requires-python = ">=3.10"
 dependencies = [
