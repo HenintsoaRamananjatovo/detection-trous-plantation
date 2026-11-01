@@ -20,10 +20,9 @@ from plantation_inference import (
 )
 
 
-# Poids validés le 22 septembre 2026 : 95 % de rappel, 85 % de précision et
-# 84 % de justesse de bout en bout sur les 8 tuiles de test de result_00389m.
+# Poids V4 (nov. 2026) : fine-tune drone_mosaic + terrains V2, NMS centres 30 px.
 EXPECTED_WEIGHTS_SHA256 = (
-    "6c296b3eafc1b9b4982bb93c59a1133eb865826c4bf4bfa5c57a3cd1a4784305"
+    "b6867b28b41a83e4495c56b14b83df833ede1c4eb006062a1a7a7f686dc1c52e"
 )
 
 RECALIBRATION_REMINDER = (
@@ -48,7 +47,8 @@ def test_a_configuration_without_options_is_the_calibrated_one(tmp_path: Path) -
     config = PipelineConfig(source=tmp_path / "parcelle.tif", output_root=tmp_path)
 
     assert config.model == DEFAULT_MODEL
-    assert config.box_scale == DEFAULT_BOX_SCALE == 0.82
+    assert config.box_scale == DEFAULT_BOX_SCALE == 0.90
     assert config.max_aspect_ratio == DEFAULT_MAX_ASPECT_RATIO == 2.0
     assert config.confidence == DEFAULT_CONFIDENCE == 0.20
     assert config.overlap == 128
+    assert config.nms_center_distance_px == 30.0

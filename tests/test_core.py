@@ -7,8 +7,10 @@ from affine import Affine
 from plantation_inference.detection import (
     aspect_ratio,
     global_class_agnostic_nms,
+    intersection_over_union,
     rgb_to_ultralytics_source,
     scale_box,
+    suppress_nearby_centers,
 )
 from plantation_inference.geospatial import detection_map_center, detection_map_ring
 from plantation_inference.outputs import calculate_success_rate
@@ -138,6 +140,17 @@ def test_global_nms_is_class_agnostic_and_keeps_best_box() -> None:
     )
 
     assert kept == [higher_occupied, separate]
+
+
+def test_nearby_centers_are_suppressed_even_with_low_iou() -> None:
+    # Deux boîtes du même trou, décalées : IoU ~0.2, centres à ~20 px.
+    first = make_detection(0, 0.9, (0, 0, 30, 30))
+    duplicate = make_detection(0, 0.6, (20, 0, 50, 30))
+    neighbor = make_detection(0, 0.8, (90, 0, 120, 30))
+
+    assert intersection_over_union(first, duplicate) < 0.45
+    kept = suppress_nearby_centers([first, duplicate, neighbor], 25.0)
+    assert kept == [first, neighbor]
 
 
 def test_success_rate() -> None:

@@ -12,6 +12,7 @@ from plantation_inference import (
     DEFAULT_CONFIDENCE,
     DEFAULT_MAX_ASPECT_RATIO,
     DEFAULT_MODEL,
+    DEFAULT_NMS_CENTER_DISTANCE_PX,
     PipelineConfig,
     run_pipeline,
 )
@@ -94,6 +95,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--overlap", type=int, default=0)
     parser.add_argument("--nms-iou", type=float, default=0.45)
     parser.add_argument(
+        "--nms-center-distance",
+        type=float,
+        default=None,
+        help=(
+            "Fusionne les boîtes dont les centres sont plus proches que cette "
+            "distance en pixels (doublons de tuiles). Défaut : valeur du paquet."
+        ),
+    )
+    parser.add_argument(
         "--device",
         default="cpu",
         help='Périphérique Ultralytics : "cpu", "0" pour le premier GPU, ou "auto"',
@@ -125,6 +135,11 @@ def main() -> int:
         tile_size=args.tile_size,
         overlap=args.overlap,
         nms_iou=args.nms_iou,
+        nms_center_distance_px=(
+            args.nms_center_distance
+            if args.nms_center_distance is not None
+            else DEFAULT_NMS_CENTER_DISTANCE_PX
+        ),
         device=args.device,
         run_name=args.run_name,
     )

@@ -285,3 +285,58 @@ def global_class_agnostic_nms(
         for cell in cells:
             buckets[cell].append(new_index)
     return kept
+
+
+def suppress_nearby_centers(
+    detections: Sequence[Detection],
+    min_center_distance_px: float,
+) -> list[Detection]:
+    """Fusionne les doublons quasi colocalisés même si leur IoU est faible.
+
+    Après chevauchement de tuiles, un même trou produit souvent 2–3 boîtes
+    légèrement décalées : trop peu pour l'IoU NMS à 0.45, assez pour compter
+    plusieurs fois. On ne garde que la plus confiante dans un rayon donné.
+    """
+    if min_center_distance_px < 0:
+        raise ValueError("min_center_distance_px doit être positif ou nul")
+    if min_center_distance_px == 0 or not detections:
+        return list(detections)
+
+    cell_size = max(min_center_distance_px, 1.0)
+    radius_sq = min_center_distance_px * min_center_distance_px
+    ordered = sorted(
+        enumerate(detections),
+        key=lambda item: (-item[1].confidence, item[0]),
+    )
+    kept: list[Detection] = []
+    buckets: dict[tuple[int, int], list[int]] = defaultdict(list)
+
+    def neighbor_cells(center_x: float, center_y: float) -> list[tuple[int, int]]:
+        column = math.floor(center_x / cell_size)
+        row = math.floor(center_y / cell_size)
+        return [
+            (row + row_delta, column + column_delta)
+            for row_delta in (-1, 0, 1)
+            for column_delta in (-1, 0, 1)
+        ]
+
+    for _, candidate in ordered:
+        center_x, center_y = candidate.center
+        possible_matches = {
+            kept_index
+            for cell in neighbor_cells(center_x, center_y)
+            for kept_index in buckets.get(cell, ())
+        }
+        if any(
+            (center_x - kept[kept_index].center[0]) ** 2
+            + (center_y - kept[kept_index].center[1]) ** 2
+            < radius_sq
+            for kept_index in possible_matches
+        ):
+            continue
+        new_index = len(kept)
+        kept.append(candidate)
+        buckets[
+            (math.floor(center_y / cell_size), math.floor(center_x / cell_size))
+        ].append(new_index)
+    return kept

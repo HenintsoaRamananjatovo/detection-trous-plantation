@@ -18,10 +18,16 @@ DEFAULT_CONFIDENCE = 0.20
 # déployé, et recalibrer après chaque réentraînement : le ratio médian entre
 # taille prédite et taille annotée sur la validation, dont on prend l'inverse.
 # Sans cette correction, le rappel tombe de 94 % à 61 % sur le test verrouillé.
-DEFAULT_BOX_SCALE = 0.82
-# 0.82 et 2.0 maximisent le F1 conjointement sur les tuiles de test source2 et
+# V4 (nov. 2026) : recalibré sur la val dataset_build_v4 (ratio médian ~1,11).
+# V2 était à 0.82. Recalibrer après chaque réentraînement.
+DEFAULT_BOX_SCALE = 0.90
+# 2.0 maximise le F1 conjointement sur les tuiles de test source2 et
 # result00389 ; voir PlantationDatasetV2/geotiff_evaluation/shape_filter.json.
 DEFAULT_MAX_ASPECT_RATIO = 2.0
+# Après chevauchement de tuiles, le NMS IoU laisse passer des doublons
+# légèrement décalés (IoU faible). Un rayon ~30 px (~1 m à 3 cm/px) fusionne
+# ces copies sans coller deux trous voisins d'une plantation typique (~2 m).
+DEFAULT_NMS_CENTER_DISTANCE_PX = 30.0
 
 
 @dataclass(frozen=True)
@@ -77,6 +83,7 @@ class PipelineConfig:
     # par le bord d'une tuile sont souvent manqués, quel que soit le terrain.
     overlap: int = 128
     nms_iou: float = 0.45
+    nms_center_distance_px: float = DEFAULT_NMS_CENTER_DISTANCE_PX
     device: str = "cpu"
     run_name: str | None = None
 
@@ -107,6 +114,8 @@ class PipelineConfig:
             raise ValueError("overlap doit être positif et inférieur à tile_size")
         if not 0 <= self.nms_iou <= 1:
             raise ValueError("nms_iou doit être compris entre 0 et 1")
+        if self.nms_center_distance_px < 0:
+            raise ValueError("nms_center_distance_px doit être positif ou nul")
 
 
 @dataclass(frozen=True)

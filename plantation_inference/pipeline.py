@@ -15,6 +15,7 @@ from .detection import (
     YoloDetector,
     aspect_ratio,
     global_class_agnostic_nms,
+    suppress_nearby_centers,
 )
 from .preparation import prepared_copy
 from .outputs import (
@@ -270,6 +271,9 @@ def run_pipeline(
         f"Déduplication de {len(raw_detections)} boîtes",
     )
     detections = global_class_agnostic_nms(raw_detections, config.nms_iou)
+    detections = suppress_nearby_centers(
+        detections, config.nms_center_distance_px
+    )
 
     geopackage = run_dir / "detections.gpkg"
     detections_csv = run_dir / "detections.csv"
@@ -317,6 +321,7 @@ def run_pipeline(
                 "tile_size": config.tile_size,
             "overlap": config.overlap,
             "nms_iou": config.nms_iou,
+            "nms_center_distance_px": config.nms_center_distance_px,
             "device": config.device,
         },
         "raster": raster_metadata,
